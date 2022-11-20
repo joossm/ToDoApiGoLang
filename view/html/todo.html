@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TODO</title>
+</head>
+<body>
+Todo
+
+
+<div style="text-align: center;">
+    <br><br>
+    <form action="/todo" method="post">
+        New ToDo:<input name="todo" required type="text"><br><br>
+        <input type="submit" value="Todo">
+    </form>
+    <br><br>
+    <h1>Overview of your ToDos</h1>
+    <br>
+    <br><br>
+    <div class="tg-wrap",style="text-align: center;">
+        <table>
+            <thead>
+            {{range .}}
+            <tr>
+                <td>Name:</td>
+                <td>{{ .TodosName }}</td>
+                <td></td>
+            </tr>
+            {{end}}
+            </thead>
+        </table>
+    </div>
+</div>
+</body>
+</html>
