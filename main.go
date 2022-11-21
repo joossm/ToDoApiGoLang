@@ -23,6 +23,10 @@ func main() {
 	serveMux.HandleFunc("/logout", handler.Logout)
 	serveMux.HandleFunc("/addUser", handler.AddUser)
 	log.Printf("About to listen on 8443. Go to http://127.0.0.1:8443/register\n Go to http://127.0.0.1:8443/login")
-	_ = http.ListenAndServe(":8443", serveMux)
+	//err := http.ListenAndServeTLS(":8443", "OpenPGP_0xDC5E2C7D7B83A73E.asc", "OpenPGP_signature", serveMux)
+	err := http.ListenAndServe(":8443", serveMux)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
