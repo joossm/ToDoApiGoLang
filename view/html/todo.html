@@ -1,29 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
-          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" rel="stylesheet">
     <meta charset="UTF-8">
     <title>TODO</title>
     <style>
-        body, html {
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
         div {
-            padding: 10px;
-            background: #eee;
+            padding: 30px;
         }
     </style>
 </head>
-
 <body>
-
-<div class="centered">
-    <div class="centered">
+<div>
+    <div>
         <h1>New ToDos</h1>
         <form action="/todo" method="post">
             Todo Name: <br><input name="todo" required type="text"><br><br>
@@ -33,19 +23,18 @@
     </div>
     <br><br>
     <h1>Overview of your ToDos</h1>
-    <table border="8" cellspacing="10" cellpadding="20">
+    <table border="8" cellpadding="20" cellspacing="10">
         <thead>
         <tr>
-            <th>Todo ID</th>
             <th>Todo Name</th>
             <th>Todo Text</th>
             <th>Done?</th>
             <th></th>
             <th></th>
+            <th>Add User by Username</th>
         </tr>
         {{range .}}
         <tr>
-            <th>{{.IdTodos}}</th>
             <th>{{.TodosName}}</th>
             <th>{{.TodosText}}</th>
             <th>{{.TodosDone}}</th>
@@ -74,8 +63,6 @@
         <input type="submit" value="Logout"/>
     </form>
 </div>
-
-
 </body>
 </html>
 
