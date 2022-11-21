@@ -18,7 +18,10 @@ func main() {
 	serveMux.HandleFunc("/login", handler.Login)
 	serveMux.HandleFunc("/register", handler.Register)
 	serveMux.HandleFunc("/todo", handler.ToDo)
-
+	serveMux.HandleFunc("/delete", handler.Delete)
+	serveMux.HandleFunc("/update", handler.Update)
+	serveMux.HandleFunc("/logout", handler.Logout)
+	serveMux.HandleFunc("/addUser", handler.AddUser)
 	log.Printf("About to listen on 8443. Go to http://127.0.0.1:8443/register\n Go to http://127.0.0.1:8443/login")
 	_ = http.ListenAndServe(":8443", serveMux)
 

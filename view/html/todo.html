@@ -1,36 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <meta charset="UTF-8">
     <title>TODO</title>
+    <style>
+        body, html {
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        div {
+            padding: 10px;
+            background: #eee;
+        }
+    </style>
 </head>
+
 <body>
-Todo
 
-
-<div style="text-align: center;">
-    <br><br>
-    <form action="/todo" method="post">
-        New ToDo:<input name="todo" required type="text"><br><br>
-        <input type="submit" value="Todo">
-    </form>
+<div class="centered">
+    <div class="centered">
+        <h1>New ToDos</h1>
+        <form action="/todo" method="post">
+            Todo Name: <br><input name="todo" required type="text"><br><br>
+            Todo Text: <br><input name="text" required type="text"><br><br>
+            <input type="submit" value="Add">
+        </form>
+    </div>
     <br><br>
     <h1>Overview of your ToDos</h1>
+    <table border="8" cellspacing="10" cellpadding="20">
+        <thead>
+        <tr>
+            <th>Todo ID</th>
+            <th>Todo Name</th>
+            <th>Todo Text</th>
+            <th>Done?</th>
+            <th></th>
+            <th></th>
+        </tr>
+        {{range .}}
+        <tr>
+            <th>{{.IdTodos}}</th>
+            <th>{{.TodosName}}</th>
+            <th>{{.TodosText}}</th>
+            <th>{{.TodosDone}}</th>
+            <th>
+                <form action="/delete?id={{ .IdTodos }}" method="post">
+                    <input type="submit" value="DELETE"/>
+                </form>
+            </th>
+            <th>
+                <form action="/update?id={{ .IdTodos }}" method="post">
+                    <input type="submit" value="TOGGLE DONE"/>
+                </form>
+            </th>
+            <th>
+                <form action="/addUser?id={{ .IdTodos }}" method="post">
+                    <input name="username" required type="text">
+                    <input type="submit" value="ADD"/>
+                </form>
+            </th>
+        </tr>
+        {{end}}
+        </thead>
+    </table>
     <br>
-    <br><br>
-    <div class="tg-wrap",style="text-align: center;">
-        <table>
-            <thead>
-            {{range .}}
-            <tr>
-                <td>Name:</td>
-                <td>{{ .TodosName }}</td>
-                <td></td>
-            </tr>
-            {{end}}
-            </thead>
-        </table>
-    </div>
+    <form action="/logout" method="post">
+        <input type="submit" value="Logout"/>
+    </form>
 </div>
+
+
 </body>
 </html>
+

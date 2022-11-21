@@ -14,21 +14,22 @@ func Login(responseWriter http.ResponseWriter, request *http.Request) {
 	if request.Method == "POST" {
 
 		var users []model.User
-		users = getAllUSersFromDB()
+		users, _, _ = getFromDatabase("users")
 		for _, user := range users {
-			if user.Username == request.FormValue("username") && user.Password == request.FormValue("password") {
+			if user.Username == request.FormValue("username") &&
+				user.Password == request.FormValue("password") {
 				//Login Success!
 				setCookie(responseWriter, "username", user.Username)
 				setCookie(responseWriter, "id", strconv.Itoa(user.IdUsers))
 				http.Redirect(responseWriter, request, "/todo", 301)
 				return
-			} else {
-				//Wrong Username or Password
-				parseAndExecuteWebsite("view/html/login.html", responseWriter, "Wrong Username or Password!")
-				return
-
 			}
 		}
+		//Wrong Username or Password
+		parseAndExecuteWebsite("view/html/login.html", responseWriter,
+			"Wrong Username or Password!")
+		return
+
 	}
 	if request.Method == "GET" {
 		parseAndExecuteWebsite("view/html/login.html", responseWriter, nil)
@@ -37,92 +38,155 @@ func Login(responseWriter http.ResponseWriter, request *http.Request) {
 
 func Register(responseWriter http.ResponseWriter, request *http.Request) {
 	if request.Method == "POST" {
-
 		var users []model.User
-		users = getAllUSersFromDB()
+		users, _, _ = getFromDatabase("users")
 		for _, user := range users {
 			if user.Username == request.FormValue("username") {
 				fmt.Println("Username Taken!")
-				parseAndExecuteWebsite("view/html/register.html", responseWriter, "Username already Taken!")
+				parseAndExecuteWebsite("view/html/register.html", responseWriter,
+					"Username already Taken!")
 				return
-			} else {
-				db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-				if err != nil {
-					panic(err.Error())
-				}
-				_, err = db.Exec("INSERT INTO `todoapi`.`users` (`Username`, `Password`) VALUES ('" + request.FormValue("username") + "', '" + request.FormValue("password") + "');")
-				if err != nil {
-					return
-				}
-				defer closeDB(db)
-				fmt.Println("Success!")
-				http.Redirect(responseWriter, request, "/login", 301)
-
 			}
 		}
-
+		db := openDB()
+		//_, err = db.Exec("INSERT INTO `todoapi`.`users` (`Username`, `Password`) VALUES ('" + request.FormValue("username") + "', '" + request.FormValue("password") + "');")
+		_, err := db.Exec("INSERT INTO `todoapi`.`users` (`Username`, `Password`) VALUES (?, ?);", request.FormValue("username"), request.FormValue("password"))
+		errorHandler(err)
+		defer closeDB(db)
+		fmt.Println("Success!")
+		http.Redirect(responseWriter, request, "/login", 301)
 	}
-
 	if request.Method == "GET" {
 		parseAndExecuteWebsite("view/html/register.html", responseWriter, nil)
 	}
-
 }
-
+func AddUser(responseWriter http.ResponseWriter, request *http.Request) {
+	// get id from url
+	id := request.URL.Query().Get("id")
+	// get id from todoapi.users
+	db := openDB()
+	result, err := db.Query("SELECT IdUsers, Username FROM todoapi.users WHERE Username = ?", request.FormValue("username"))
+	errorHandler(err)
+	defer closeDB(db)
+	var user model.User
+	for result.Next() {
+		err := result.Scan(&user.IdUsers, &user.Username)
+		errorHandler(err)
+	}
+	// add userid and todoid to todoapi.todoowners
+	db = openDB()
+	_, err = db.Exec("INSERT INTO `todoapi`.`todoowners` (`IdOfOwner`, `IdOfTodo`) VALUES (?,?);", user.IdUsers, id)
+	errorHandler(err)
+	defer closeDB(db)
+	// redirect to /todo
+	parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
+}
 func ToDo(responseWriter http.ResponseWriter, request *http.Request) {
-	if request.Method == "POST" {
-		db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-		if err != nil {
-			panic(err.Error())
-		}
-		todosName := request.FormValue("todo")
-		_, err = db.Exec("INSERT INTO `todoapi`.`todos` (`TodosName`, `TodosDone`) VALUES ('" + todosName + "', '0');")
-		defer closeDB(db)
-
-		var todos []model.ToDo
-		todos = getAllTodosFromDB()
-		userid := informationsFromCookies("id", request)
-		db, err = sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-		idTodos := strconv.Itoa(todos[len(todos)-1].IdTodos)
-		queryInsert := "INSERT INTO `todoapi`.`todoowners` (`IdOfOwner`, `IdOfTodo`) VALUES ('" + userid + "', '" + idTodos + "');"
-		_, err = db.Exec(queryInsert)
-		if err != nil {
+	userid := informationsFromCookies("id", request)
+	if userid == "NO INFORMATION" || userid == "" {
+		http.Redirect(responseWriter, request, "/login", 301)
+		return
+	} else {
+		if request.Method == "POST" {
+			db := openDB()
+			todosName := request.FormValue("todo")
+			todosText := request.FormValue("text")
+			_, err := db.Exec("INSERT INTO `todoapi`.`todos` (`TodosName`, `TodosDone`, `TodosText`) VALUES (?, '0', ?);", todosName, todosText)
+			errorHandler(err)
+			defer closeDB(db)
+			var todos []model.ToDo
+			_, todos, _ = getFromDatabase("todos")
+			userid := informationsFromCookies("id", request)
+			db = openDB()
+			idTodos := strconv.Itoa(todos[len(todos)-1].IdTodos)
+			_, err = db.Exec("INSERT INTO `todoapi`.`todoowners` (`IdOfOwner`, `IdOfTodo`) VALUES (?,?);", userid, idTodos)
+			errorHandler(err)
+			defer closeDB(db)
+			//http.Redirect(responseWriter, request, "/todo", 301)
+			parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
 			return
 		}
-		defer closeDB(db)
-		//http.Redirect(responseWriter, request, "/todo", 301)
+		if request.Method == "GET" {
+			parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
+		}
+
+	}
+}
+
+func Delete(responseWriter http.ResponseWriter, request *http.Request) {
+	userid := informationsFromCookies("id", request)
+	if userid == "NO INFORMATION" || userid == "" {
+		http.Redirect(responseWriter, request, "/login", 301)
+		return
+	} else {
+		// get id from url
+		id := request.URL.Query().Get("id")
+		// delete todo from database
+		db := openDB()
+		_, err := db.Exec("DELETE FROM `todoapi`.`todos` WHERE (`IdTodos` = ?);", id)
+		_, err = db.Exec("DELETE FROM `todoapi`.`todoowners` WHERE (`IdOfTodo` = ?);", id)
+		errorHandler(err)
 		parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
 		return
 	}
-
-	if request.Method == "GET" {
-
+}
+func Update(responseWriter http.ResponseWriter, request *http.Request) {
+	userid := informationsFromCookies("id", request)
+	if userid == "NO INFORMATION" || userid == "" {
+		http.Redirect(responseWriter, request, "/login", 301)
+		return
+	} else {
+		// get id from url
+		id := request.URL.Query().Get("id")
+		// update todo from database
+		var todos []model.ToDo
+		_, todos, _ = getFromDatabase("todos")
+		for _, todo := range todos {
+			if strconv.Itoa(todo.IdTodos) == id {
+				if todo.TodosDone == 0 {
+					db := openDB()
+					_, err := db.Exec("UPDATE `todoapi`.`todos` SET `TodosDone` = '1' WHERE (`IdTodos` = ?);", id)
+					errorHandler(err)
+					parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
+					return
+				} else {
+					db := openDB()
+					_, err := db.Exec("UPDATE `todoapi`.`todos` SET `TodosDone` = '0' WHERE (`IdTodos` = ?);", id)
+					errorHandler(err)
+					parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
+					return
+				}
+			}
+		}
+		db := openDB()
+		_, err := db.Exec("UPDATE FROM `todoapi`.`todos` WHERE (`IdTodos` = ?);", id)
+		errorHandler(err)
 		parseAndExecuteWebsite("view/html/todo.html", responseWriter, getAllTodosFromUsers(request))
+		return
 	}
+}
+func Logout(responseWriter http.ResponseWriter, request *http.Request) {
+	// delete cookie
+	setCookie(responseWriter, "username", "")
+	setCookie(responseWriter, "id", "")
+	http.Redirect(responseWriter, request, "/login", 301)
+	return
 
 }
 
 func getAllTodosFromUsers(request *http.Request) []model.ToDo {
-	var toDos []model.ToDo
-	var toDoOwner []model.TodoOwner
 	userid := informationsFromCookies("id", request)
-	toDos = getAllTodosFromDB()
-	toDoOwner = getAllTodoOwnerFromDB()
-	var todosNumbers []int
-	for _, do := range toDoOwner {
-		if strconv.Itoa(do.IdOfOwner) == userid {
-			todosNumbers = append(todosNumbers, do.IdOfTodo)
-		}
+	db := openDB()
+	result, err := db.Query("SELECT todos.IdTodos, todos.TodosName, todos.TodosDone, todos.TodosText FROM todoapi.todoowners, todoapi.todos WHERE todoowners.IdOfTodo = todos.IdTodos AND todoowners.IdOfOwner = ?;", userid)
+	errorHandler(err)
+	var toDos []model.ToDo
+	for result.Next() {
+		var toDo model.ToDo
+		err = result.Scan(&toDo.IdTodos, &toDo.TodosName, &toDo.TodosDone, &toDo.TodosText)
+		errorHandler(err)
+		toDos = append(toDos, toDo)
 	}
-	var todosResult []model.ToDo
-	for _, number := range todosNumbers {
-		for _, do := range toDos {
-			if do.IdTodos == number {
-				todosResult = append(todosResult, do)
-			}
-		}
-	}
-	return todosResult
+	return toDos
 }
 func informationsFromCookies(value string, request *http.Request) string {
 	for _, cookie := range request.Cookies() {
@@ -135,92 +199,83 @@ func informationsFromCookies(value string, request *http.Request) string {
 	}
 	return "NO INFORMATION"
 }
+func getFromDatabase(want string) ([]model.User, []model.ToDo, []model.TodoOwner) {
+	db := openDB()
+	if want == "users" {
+		result, err := db.Query("SELECT IdUsers, Username, Password FROM users")
+		errorHandler(err)
+		var users []model.User
+		for result.Next() {
+			var user model.User
+			err = result.Scan(&user.IdUsers, &user.Username, &user.Password)
 
-func getAllUSersFromDB() []model.User {
-	db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-	if err != nil {
-		panic(err.Error())
-	}
-	result, err := db.Query("SELECT IdUsers, Username, Password FROM users")
-	if err != nil {
-		panic(err.Error())
-	}
-	var users []model.User
-	for result.Next() {
-		var user model.User
-		err = result.Scan(&user.IdUsers, &user.Username, &user.Password)
-		if err != nil {
-			panic(err.Error())
+			users = append(users, user)
 		}
-		users = append(users, user)
+		closeDB(db)
+		return users, nil, nil
+	}
+	if want == "todos" {
+		result, err := db.Query("SELECT IdTodos,TodosName, TodosDone, TodosText FROM todos")
+		errorHandler(err)
+		var todos []model.ToDo
+		for result.Next() {
+			var toDo model.ToDo
+			err = result.Scan(&toDo.IdTodos, &toDo.TodosName, &toDo.TodosDone, &toDo.TodosText)
+			errorHandler(err)
+			todos = append(todos, toDo)
+		}
+		closeDB(db)
+		return nil, todos, nil
+	}
+	if want == "todoowners" {
+		result, err := db.Query("SELECT IdTodoOwners,IdOfOwner,IdOfTodo FROM todoowners")
+		errorHandler(err)
+		var todoOwners []model.TodoOwner
+		for result.Next() {
+			var todoOwner model.TodoOwner
+			err = result.Scan(&todoOwner.IdTodoOwner, &todoOwner.IdOfOwner, &todoOwner.IdOfTodo)
+			errorHandler(err)
+			todoOwners = append(todoOwners, todoOwner)
+		}
+		closeDB(db)
+		return nil, nil, todoOwners
 	}
 	defer closeDB(db)
-	return users
-}
-func getAllTodosFromDB() []model.ToDo {
-	db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-	if err != nil {
-		panic(err.Error())
-	}
-	result, err := db.Query("SELECT IdTodos,TodosName, TodosDone FROM todos")
-	if err != nil {
-		panic(err.Error())
-	}
-	var todos []model.ToDo
-	for result.Next() {
-		var toDo model.ToDo
-		err = result.Scan(&toDo.IdTodos, &toDo.TodosName, &toDo.TodosDone)
-		if err != nil {
-			panic(err.Error())
-		}
-		todos = append(todos, toDo)
-	}
-	print(result)
-	defer closeDB(db)
-	return todos
-}
-func getAllTodoOwnerFromDB() []model.TodoOwner {
-	db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
-	if err != nil {
-		panic(err.Error())
-	}
-	result, err := db.Query("SELECT IdTodoOwners,IdOfOwner,IdOfTodo FROM todoowners")
-	if err != nil {
-		panic(err.Error())
-	}
-	var todoOwners []model.TodoOwner
-	for result.Next() {
-		var todoOwner model.TodoOwner
-		err = result.Scan(&todoOwner.IdTodoOwner, &todoOwner.IdOfOwner, &todoOwner.IdOfTodo)
-		if err != nil {
-			panic(err.Error())
-		}
-		todoOwners = append(todoOwners, todoOwner)
-	}
-	defer closeDB(db)
-	return todoOwners
-}
-func closeDB(db *sql.DB) {
-	err := db.Close()
-	if err != nil {
-
-	}
+	return nil, nil, nil
 }
 
 func parseAndExecuteWebsite(filename string, responseWriter http.ResponseWriter, data interface{}) {
 	t, err := template.ParseFiles(filename)
 	if err != nil {
-		fmt.Println(err)
+		errorHandler(err)
 		return
 	}
 	err = t.Execute(responseWriter, data)
 	if err != nil {
-		fmt.Println(err)
+		errorHandler(err)
 		return
 	}
 }
-func setCookie(responseWriter http.ResponseWriter, name string, value string) {
 
+func setCookie(responseWriter http.ResponseWriter, name string, value string) {
 	cookieToStore := http.Cookie{Name: name, Value: value}
 	http.SetCookie(responseWriter, &cookieToStore)
+}
+
+func errorHandler(err error) {
+	if err != nil {
+		fmt.Println(err)
+		panic(err.Error())
+	}
+}
+
+func closeDB(db *sql.DB) {
+	err := db.Close()
+	errorHandler(err)
+}
+
+func openDB() *sql.DB {
+	db, err := sql.Open("mysql", "root:admin@tcp(127.0.0.1:3306)/todoapi")
+	errorHandler(err)
+	return db
 }
